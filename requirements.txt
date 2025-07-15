@@ -1,0 +1,7 @@
+python-telegram-bot
+pika
+SpeechRecognition
+Pillow
+pytesseract
+python-dotenv
+pydub
