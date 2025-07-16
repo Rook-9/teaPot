@@ -65,6 +65,14 @@ def search_by_rating(user_id, min_rating):
     conn.close()
     return results
 
+def show_all_entries(user_id):
+    conn = sqlite3.connect('teapot.db')
+    c = conn.cursor()
 
+    c.execute('''SELECT * FROM entries WHERE user_id = ? ORDER BY created_at DESC''', (user_id,))
+    results = c.fetchall()
+    
+    conn.close()
+    return results
 # Add more CRUD operations later
 init_db()

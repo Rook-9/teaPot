@@ -102,8 +102,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         return CHOOSING_ACTION
 
     elif text == BTN_VIEW_TABLE:
-        await update.message.reply_text("📋 (Здесь будет таблица — скоро добавим!)")
-        return CHOOSING_ACTION
+        return await show_all_entries(update, context)
+
     
     elif text == BTN_SEARCH:
         await search_entries(update, context)
@@ -112,7 +112,28 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     else:
         await update.message.reply_text("Не понял команду.")
         return CHOOSING_ACTION
-    
+
+# Вывод всех записей в таблице
+async def show_all_entries(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.message.from_user.id
+    entries = db.show_all_entries(user_id)
+
+    if not entries:
+        await update.message.reply_text("Нет записей в дневнике.")
+    else:
+        response = ""
+        for i, row in enumerate(entries, start=1):
+            response += (
+                f"{i}. 🍵 {row[2]}\n"
+                f"💬 {row[3]}\n"
+                f"🔧 {row[4]}\n"
+                f"🌟 {row[5]}/10\n"
+                f"💰 {row[6]}₾\n"
+                f"📅 {row[7]}\n\n"
+            )
+        await update.message.reply_text(response[:4000])  # Telegram limit
+    return CHOOSING_ACTION
+
 # Поиск по базе данных
 async def search_entries(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
