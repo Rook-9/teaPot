@@ -28,11 +28,15 @@ BTN_TEXT = "📝 Текст"
 BTN_AUDIO = "🎤 Аудио"
 BTN_PHOTO = "📷 Фото"
 BTN_BACK = "🔙 Назад"
+BTN_BACK_TO_MENU = "🔙 Главное меню"
+BTN_NEXT_PAGE = "➡️ Далее"
+BTN_PREV_PAGE = "⬅️ Назад"
 BTN_RATING = "🌟 По рейтингу"
 BTN_NAME = "📝 По названию"
 BTN_SAVE = "✅ Сохранить"
 BTN_EDIT = "✏️ Изменить"
 BTN_DELETE = "🗑 Удалить"
+PAGE_SIZE = 5 # Количество записей на странице
 
 
 def main_menu_keyboard():
@@ -102,7 +106,21 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         return CHOOSING_ACTION
 
     elif text == BTN_VIEW_TABLE:
-        return await show_all_entries(update, context)
+        context.user_data["current_page"] = 0
+        return await show_all_entries_paginated(update, context)
+
+    elif text == BTN_NEXT_PAGE:
+        context.user_data["current_page"] = context.user_data.get("current_page", 0) + 1
+        return await show_all_entries_paginated(update, context)
+
+    elif text == BTN_PREV_PAGE:
+        context.user_data["current_page"] = max(context.user_data.get("current_page", 0) - 1, 0)
+        return await show_all_entries_paginated(update, context)
+
+    elif text == BTN_BACK_TO_MENU:
+        context.user_data.pop("current_page", None)
+        await update.message.reply_text("🔙 Возвращаюсь в главное меню", reply_markup=main_menu_keyboard())
+        return CHOOSING_ACTION
 
     
     elif text == BTN_SEARCH:
@@ -132,6 +150,54 @@ async def show_all_entries(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 f"📅 {row[7]}\n\n"
             )
         await update.message.reply_text(response[:4000])  # Telegram limit
+    return CHOOSING_ACTION
+
+# пагинация для больших таблиц
+async def show_all_entries_paginated(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.message.from_user.id
+    entries = db.show_all_entries(user_id)
+    total_entries = len(entries)
+
+    if not entries:
+        await update.message.reply_text("Нет записей в базе.")
+        return CHOOSING_ACTION
+
+    page = context.user_data.get("current_page", 0)
+    start = page * PAGE_SIZE
+    end = start + PAGE_SIZE
+
+    entries_page = entries[start:end]
+
+    text = ""
+    for i, row in enumerate(entries_page, start=start + 1):
+        text += (
+            f"{i}. 🍵 {row[2]}\n"
+            f"💬 {row[3]}\n"
+            f"🔧 {row[4]}\n"
+            f"🌟 {row[5]}/10\n"
+            f"💰 {row[6]}₾\n"
+            f"📅 {row[7]}\n\n"
+        )
+    
+    # Клавиатура навигации
+    buttons = []
+    if page > 0:
+        buttons.append(BTN_PREV_PAGE)
+    if end < total_entries:
+        buttons.append(BTN_NEXT_PAGE)
+    buttons.append(BTN_BACK_TO_MENU)
+
+    await update.message.reply_text(
+        text.strip(),
+        reply_markup=ReplyKeyboardMarkup(
+            [buttons],
+            resize_keyboard=True
+        )
+    )    
+    
+    context.user_data["all_entries"] = entries  # Сохраняем все записи для навигации
+    context.user_data["current_page"] = page
+
     return CHOOSING_ACTION
 
 # Поиск по базе данных
