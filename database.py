@@ -74,5 +74,28 @@ def show_all_entries(user_id):
     
     conn.close()
     return results
+
+def get_entries_paginated(user_id: int, limit: int, offset: int) -> list[tuple]:
+    with sqlite3.connect('teapot.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT * FROM entries
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (user_id, limit, offset)
+        )
+        return cursor.fetchall()
+
+def count_entries(user_id: int):
+    conn = sqlite3.connect('teapot.db')
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM entries WHERE user_id = ?", (user_id,))
+    total = c.fetchone()[0]
+    conn.close()
+    return total
+
 # Add more CRUD operations later
 init_db()

@@ -37,6 +37,7 @@ BTN_SAVE = "✅ Сохранить"
 BTN_EDIT = "✏️ Изменить"
 BTN_DELETE = "🗑 Удалить"
 PAGE_SIZE = 5 # Количество записей на странице
+SHOWING_PAGE = 100  # любое уникальное число, не пересекающееся с другими
 
 
 def main_menu_keyboard():
@@ -107,21 +108,7 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     elif text == BTN_VIEW_TABLE:
         context.user_data["current_page"] = 0
-        return await show_all_entries_paginated(update, context)
-
-    elif text == BTN_NEXT_PAGE:
-        context.user_data["current_page"] = context.user_data.get("current_page", 0) + 1
-        return await show_all_entries_paginated(update, context)
-
-    elif text == BTN_PREV_PAGE:
-        context.user_data["current_page"] = max(context.user_data.get("current_page", 0) - 1, 0)
-        return await show_all_entries_paginated(update, context)
-
-    elif text == BTN_BACK_TO_MENU:
-        context.user_data.pop("current_page", None)
-        await update.message.reply_text("🔙 Возвращаюсь в главное меню", reply_markup=main_menu_keyboard())
-        return CHOOSING_ACTION
-
+        return await show_entries_page(update, context)
     
     elif text == BTN_SEARCH:
         await search_entries(update, context)
@@ -130,6 +117,22 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     else:
         await update.message.reply_text("Не понял команду.")
         return CHOOSING_ACTION
+
+async def handle_pagination(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text
+    page = context.user_data.get("current_page", 0)
+
+    if text == BTN_NEXT_PAGE:
+        context.user_data["current_page"] = page + 1
+    elif text == BTN_PREV_PAGE and page > 0:
+        context.user_data["current_page"] = page - 1
+    elif text == BTN_BACK_TO_MENU:
+        context.user_data["current_page"] = 0
+        await update.message.reply_text("Возвращаюсь в меню...", reply_markup=main_menu_keyboard())
+        return CHOOSING_ACTION
+
+    return await show_entries_page(update, context)
+
 
 # Вывод всех записей в таблице
 async def show_all_entries(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -152,53 +155,36 @@ async def show_all_entries(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text(response[:4000])  # Telegram limit
     return CHOOSING_ACTION
 
-# пагинация для больших таблиц
-async def show_all_entries_paginated(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def show_entries_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.message.from_user.id
-    entries = db.show_all_entries(user_id)
-    total_entries = len(entries)
+    page = context.user_data.get("current_page", 0)
+    offset = page * PAGE_SIZE
+
+    total = db.count_entries(user_id)
+    entries = db.get_entries_paginated(user_id, PAGE_SIZE, offset)
 
     if not entries:
-        await update.message.reply_text("Нет записей в базе.")
+        await update.message.reply_text("Нет записей.")
         return CHOOSING_ACTION
 
-    page = context.user_data.get("current_page", 0)
-    start = page * PAGE_SIZE
-    end = start + PAGE_SIZE
-
-    entries_page = entries[start:end]
-
-    text = ""
-    for i, row in enumerate(entries_page, start=start + 1):
-        text += (
-            f"{i}. 🍵 {row[2]}\n"
-            f"💬 {row[3]}\n"
-            f"🔧 {row[4]}\n"
-            f"🌟 {row[5]}/10\n"
-            f"💰 {row[6]}₾\n"
-            f"📅 {row[7]}\n\n"
+    reply = f"📄 Страница {page + 1} из {(total + PAGE_SIZE - 1) // PAGE_SIZE}\n\n"
+    for row in entries:
+        reply += (
+            f"🍵 {row[2]}\n💬 {row[3]}\n🔧 {row[4]}\n🌟 {row[5]}/10\n💰 {row[6]}₾\n🕒 {row[7]}\n\n"
         )
-    
-    # Клавиатура навигации
+
     buttons = []
     if page > 0:
         buttons.append(BTN_PREV_PAGE)
-    if end < total_entries:
+    if offset + PAGE_SIZE < total:
         buttons.append(BTN_NEXT_PAGE)
-    buttons.append(BTN_BACK_TO_MENU)
 
     await update.message.reply_text(
-        text.strip(),
-        reply_markup=ReplyKeyboardMarkup(
-            [buttons],
-            resize_keyboard=True
-        )
-    )    
-    
-    context.user_data["all_entries"] = entries  # Сохраняем все записи для навигации
-    context.user_data["current_page"] = page
+        reply,
+        reply_markup=ReplyKeyboardMarkup([buttons + [BTN_BACK_TO_MENU]], resize_keyboard=True)
+    )
 
-    return CHOOSING_ACTION
+    return SHOWING_PAGE
 
 # Поиск по базе данных
 async def search_entries(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -391,6 +377,7 @@ def main():
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start), MessageHandler(filters.Regex("^Поиск по таблице$"), search_entries),],
         states={
+            SHOWING_PAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_pagination)],
             CHOOSING_ACTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu)],
             CHOOSING_FORMAT: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_format)],
             CHOOSING_CRITERIA: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_criteria)],
