@@ -5,17 +5,18 @@ from telegram.ext import (
 )
 import logging
 import database as db
+from utils import format_entry
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 # состояния основного меню и поиска
-CHOOSING_ACTION, CHOOSING_FORMAT, CHOOSING_CRITERIA, TYPING_QUERY = range(4)
+CHOOSING_ACTION, CHOOSING_FORMAT, CHOOSING_CRITERIA, TYPING_QUERY, CHOOSING_DELETE_ENTRY, CONFIRM_DELETE = range(6)
 
 
 # состояния для ввода новой записи
-INPUT_NAME, INPUT_DESC, INPUT_BREW, INPUT_PRICE, INPUT_RATING, CONFIRM = range(4, 10)
+INPUT_NAME, INPUT_DESC, INPUT_BREW, INPUT_PRICE, INPUT_RATING, CONFIRM = range(6, 12)
 
 # Скрипт создания таблицы и инициализации базы данных
 db.init_db()
@@ -38,13 +39,14 @@ BTN_EDIT = "✏️ Изменить"
 BTN_DELETE = "🗑 Удалить"
 PAGE_SIZE = 5 # Количество записей на странице
 SHOWING_PAGE = 100  # любое уникальное число, не пересекающееся с другими
+BTN_DELETE_ENTRY = "🗑 Удалить запись"
 
 
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
         [
             [BTN_ADD_ENTRY, BTN_SEARCH],
-            [BTN_LAST_ENTRY, BTN_VIEW_TABLE]
+            [BTN_LAST_ENTRY, BTN_VIEW_TABLE], [BTN_DELETE_ENTRY]
         ],
         resize_keyboard=True
     )
@@ -61,14 +63,15 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 #скрипт для видиомости меню
-async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not update.message:
-        return
+        return ConversationHandler.END
     
     await update.message.reply_text(
         "🍵 Добро пожаловать в TeaPot! Выбери действие:",
         reply_markup=main_menu_keyboard()
     )
+    return CHOOSING_ACTION
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not update.message:
@@ -113,7 +116,10 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     elif text == BTN_SEARCH:
         await search_entries(update, context)
         return CHOOSING_CRITERIA
-
+    
+    elif text == BTN_DELETE_ENTRY:
+        return await delete_entry_start(update, context)
+    
     else:
         await update.message.reply_text("Не понял команду.")
         return CHOOSING_ACTION
@@ -133,7 +139,6 @@ async def handle_pagination(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     return await show_entries_page(update, context)
 
-
 # Вывод всех записей в таблице
 async def show_all_entries(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.message.from_user.id
@@ -144,14 +149,8 @@ async def show_all_entries(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     else:
         response = ""
         for i, row in enumerate(entries, start=1):
-            response += (
-                f"{i}. 🍵 {row[2]}\n"
-                f"💬 {row[3]}\n"
-                f"🔧 {row[4]}\n"
-                f"🌟 {row[5]}/10\n"
-                f"💰 {row[6]}₾\n"
-                f"📅 {row[7]}\n\n"
-            )
+            response += format_entry(row) + "\n\n"
+
         await update.message.reply_text(response[:4000])  # Telegram limit
     return CHOOSING_ACTION
 
@@ -169,9 +168,7 @@ async def show_entries_page(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     reply = f"📄 Страница {page + 1} из {(total + PAGE_SIZE - 1) // PAGE_SIZE}\n\n"
     for row in entries:
-        reply += (
-            f"🍵 {row[2]}\n💬 {row[3]}\n🔧 {row[4]}\n🌟 {row[5]}/10\n💰 {row[6]}₾\n🕒 {row[7]}\n\n"
-        )
+        reply += format_entry(row) + "\n\n"
 
     buttons = []
     if page > 0:
@@ -185,6 +182,57 @@ async def show_entries_page(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
 
     return SHOWING_PAGE
+
+async def delete_entry_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("delete_entry_start triggered")
+    user_id = update.message.from_user.id
+    entries = db.get_entries_paginated(user_id, limit=10, offset=0)  # можно без пагинации
+
+    if not entries:
+        await update.message.reply_text("У тебя пока нет записей для удаления.")
+        return CHOOSING_ACTION
+
+    context.user_data["delete_candidates"] = entries
+
+    reply = "Выбери номер записи для удаления:\n\n"
+    for i, row in enumerate(entries, 1):
+        reply += f"{i}. {row[2]} — {row[4]} — {row[5]}/10\n"
+
+    await update.message.reply_text(reply)
+    return CHOOSING_DELETE_ENTRY
+
+async def choose_entry_to_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text.strip()
+    if not text.isdigit():
+        await update.message.reply_text("Введи номер записи.")
+        return CHOOSING_DELETE_ENTRY
+
+    index = int(text) - 1
+    entries = context.user_data.get("delete_candidates", [])
+    if index < 0 or index >= len(entries):
+        await update.message.reply_text("Неверный номер.")
+        return CHOOSING_DELETE_ENTRY
+
+    entry = entries[index]
+    context.user_data["entry_to_delete"] = entry
+
+    await update.message.reply_text(
+        f"Удалить запись:\n🍵 {entry[2]}\n💬 {entry[3]}\n🌟 {entry[5]}/10\n\nПодтвердить?",
+        reply_markup=ReplyKeyboardMarkup([["✅ Да", "❌ Нет"]], resize_keyboard=True)
+    )
+    return CONFIRM_DELETE
+
+async def confirm_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    choice = update.message.text.strip()
+    if choice == "✅ Да":
+        entry = context.user_data.get("entry_to_delete")
+        if entry:
+            db.delete_entry(entry[0])  # предполагаем, что row[0] — это ID записи
+            await update.message.reply_text("Запись удалена ✅")
+    else:
+        await update.message.reply_text("Удаление отменено.")
+
+    return await show_menu(update, context)  # возвращаемся в главное меню
 
 # Поиск по базе данных
 async def search_entries(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -381,6 +429,8 @@ def main():
             CHOOSING_ACTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu)],
             CHOOSING_FORMAT: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_format)],
             CHOOSING_CRITERIA: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_criteria)],
+            CHOOSING_DELETE_ENTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_entry_to_delete)],
+            CONFIRM_DELETE: [MessageHandler(filters.Regex("^(✅ Да|❌ Нет)$"), confirm_delete)],
             INPUT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_name)],
             INPUT_DESC: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_desc)],
             INPUT_BREW: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_brew)],

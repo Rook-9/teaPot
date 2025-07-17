@@ -97,5 +97,10 @@ def count_entries(user_id: int):
     conn.close()
     return total
 
+def delete_entry(entry_id: int):
+    conn = sqlite3.connect('teapot.db')
+    with conn:
+        conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
+
 # Add more CRUD operations later
 init_db()
