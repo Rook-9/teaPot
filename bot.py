@@ -66,7 +66,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     
     await update.message.reply_text(
-        "🍵 Добро пожаловать в Tea Diary! Выбери действие:",
+        "🍵 Добро пожаловать в TeaPot! Выбери действие:",
         reply_markup=main_menu_keyboard()
     )
 
@@ -75,7 +75,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
 
     await update.message.reply_text(
-        "🍵 Добро пожаловать в Tea Diary!",
+        "🍵 Добро пожаловать в TeaPot!",
         reply_markup=main_menu_keyboard()
     )
     return CHOOSING_ACTION
@@ -295,7 +295,7 @@ async def input_rating(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await update.message.reply_text("Введи число от 1 до 10.")
         return INPUT_RATING
 
-    await update.message.reply_text("Укажи цену:")
+    await update.message.reply_text("Укажи цену в лари:")
     return INPUT_PRICE
 
 async def input_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
