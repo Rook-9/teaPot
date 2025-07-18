@@ -318,7 +318,11 @@ async def choose_format(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 # Сбор данных по шагам
 async def input_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-
+    name = update.message.text
+    if len(name) > 100:
+        await update.message.reply_text("Название слишком длинное. Максимум 100 символов.")
+        return INPUT_NAME
+    
     context.user_data["tea_name"] = update.message.text
     await update.message.reply_text("Добавь описание:")
     return INPUT_DESC
@@ -335,10 +339,10 @@ async def input_brew(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def input_rating(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        rating = int(update.message.text)
+        rating = float(update.message.text)
         if not (1 <= rating <= 10):
             raise ValueError
-        context.user_data["rating"] = rating
+        context.user_data["rating"] = round(rating, 1)  # округляем до 1 знака после запятой
     except ValueError:
         await update.message.reply_text("Введи число от 1 до 10.")
         return INPUT_RATING
@@ -348,11 +352,15 @@ async def input_rating(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 async def input_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        context.user_data["price"] = float(update.message.text)
+        price = float(update.message.text)
+        if price < 0:
+            await update.message.reply_text("Цена не может быть отрицательной. Попробуйте еще раз.")
+            return INPUT_PRICE
+        context.user_data["price"] = round(price, 2)  # Округляем до копеек
     except ValueError:
-        await update.message.reply_text("Введи цену числом.")
+        await update.message.reply_text("Введи цену числом (например: 12.50).")
         return INPUT_PRICE
-
+    
     # Подтверждение
     data = context.user_data
     keyboard = [[BTN_SAVE, BTN_EDIT], [BTN_DELETE]]
