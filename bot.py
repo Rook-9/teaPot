@@ -347,7 +347,7 @@ async def input_rating(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await update.message.reply_text("Введи число от 1 до 10.")
         return INPUT_RATING
 
-    await update.message.reply_text("Укажи цену в лари:")
+    await update.message.reply_text("Укажи цену в лари за 100г (Например 12.50):")
     return INPUT_PRICE
 
 async def input_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
