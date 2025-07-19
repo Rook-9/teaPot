@@ -7,3 +7,4 @@ python-dotenv
 pydub
 pytest-asyncio
 pytest
+aiogram
