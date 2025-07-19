@@ -23,7 +23,7 @@ jobs:
           pip install pytest pytest-asyncio
       
       - name: Run tests
-        run: pytest test/ -v
+        run: pytest -v
 
   build-and-push:
     needs: test
