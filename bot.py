@@ -94,7 +94,7 @@ async def welcome_on_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 chat_id=user_id,
                 text=text,
-                reply_markup=ReplyKeyboardMarkup([[KeyboardButton("/start")]], resize_keyboard=True),
+                reply_markup=main_menu_keyboard(),
                 parse_mode="HTML"
             )
 
@@ -114,10 +114,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
         await update.message.reply_html(
             text,
-            reply_markup=ReplyKeyboardMarkup(
-                [[KeyboardButton(BTN_VIEW_TABLE)]],
-                resize_keyboard=True
-            )
+            reply_markup=main_menu_keyboard()
         )
 
         # Можно подождать пару секунд или просто завершить функцию
