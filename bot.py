@@ -51,14 +51,40 @@ def main_menu_keyboard():
         resize_keyboard=True
     )
 
+async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return 
+
+    text = (
+        "🍵 <b>Привет! Добро пожаловать в TeaPot — бот-дневник для чаеманов.</b>\n\n"
+        "Сохраняй заметки о чаях, оценивай, сортируй и возвращайся к лучшим вкусам позже.\n\n"
+        "Нажми кнопку ниже или введи /start, чтобы начать ☕"
+    )
+    await update.message.reply_html(
+        text,
+        reply_markup=ReplyKeyboardMarkup(
+            [[KeyboardButton("/start")]],
+            resize_keyboard=True
+        )
+    )
 
 # Главный обработчик команд
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
+
     await update.message.reply_text(
-        "Привет! Я бот для ведения чайного дневника. "
-        "Используй /start для начала."
+        "🆘 <b>Чем я могу помочь?</b>\n\n"
+        "Вот что умеет TeaPot:\n\n"
+        "➕ <b>Добавить запись</b> — запиши информацию о чае\n"
+        "📄 <b>Просмотр таблицы</b> — листай свои записи\n"
+        "📌 <b>Последняя запись</b> — покажу самую свежую\n"
+        "🔍 <b>Поиск</b> — ищи по названию или рейтингу\n"
+        "🗑 <b>Удалить запись</b> — убери ненужное\n\n"
+        "↩️ <b>Назад</b> — отмена текущего действия\n"
+        "/cancel — экстренная остановка\n\n"
+        "👉 В любой момент жми /start, чтобы вернуться в главное меню.",
+        parse_mode='HTML'
     )
 
 
@@ -438,7 +464,7 @@ def main():
             CHOOSING_FORMAT: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_format)],
             CHOOSING_CRITERIA: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_criteria)],
             CHOOSING_DELETE_ENTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_entry_to_delete)],
-            CONFIRM_DELETE: [MessageHandler(filters.Regex("^(✅ Да|❌ Нет)$"), confirm_delete)],
+            CONFIRM_DELETE: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_delete)],
             INPUT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_name)],
             INPUT_DESC: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_desc)],
             INPUT_BREW: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_brew)],
@@ -449,7 +475,8 @@ def main():
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
-
+    application.add_handler(CommandHandler("welcome", welcome))
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(conv)
     logger.info("✅ Bot started")
     application.run_polling()
