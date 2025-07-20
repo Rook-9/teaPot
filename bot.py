@@ -1,7 +1,7 @@
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, ChatMemberUpdated
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, ContextTypes, filters,
-    ConversationHandler
+    ConversationHandler, ChatMemberHandler
 )
 import logging
 import database as db
@@ -82,6 +82,23 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return CHOOSING_ACTION
 
+async def welcome_on_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if isinstance(update.my_chat_member, ChatMemberUpdated):
+        if update.my_chat_member.new_chat_member.status == "member":
+            user_id = update.effective_user.id
+            text = (
+                "🍵 <b>Привет! Добро пожаловать в TeaPot — бот-дневник для чаеманов.</b>\n\n"
+                "Сохраняй заметки о чаях, оценивай, сортируй и возвращайся к лучшим вкусам позже.\n\n"
+                "Нажми кнопку ниже или просто выбери действие ☕"
+            )
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=ReplyKeyboardMarkup([[KeyboardButton("/start")]], resize_keyboard=True),
+                parse_mode="HTML"
+            )
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not update.message:
         return ConversationHandler.END
@@ -98,7 +115,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.message.reply_html(
             text,
             reply_markup=ReplyKeyboardMarkup(
-                [[KeyboardButton("/start")]],  # Или кнопку /start, если хочешь именно её
+                [[KeyboardButton(BTN_VIEW_TABLE)]],
                 resize_keyboard=True
             )
         )
@@ -480,6 +497,7 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
+    application.add_handler(ChatMemberHandler(welcome_on_open, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(conv)
     logger.info("✅ Bot started")
