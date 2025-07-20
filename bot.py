@@ -51,23 +51,6 @@ def main_menu_keyboard():
         resize_keyboard=True
     )
 
-async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message:
-        return 
-
-    text = (
-        "🍵 <b>Привет! Добро пожаловать в TeaPot — бот-дневник для чаеманов.</b>\n\n"
-        "Сохраняй заметки о чаях, оценивай, сортируй и возвращайся к лучшим вкусам позже.\n\n"
-        "Нажми кнопку ниже или введи /start, чтобы начать ☕"
-    )
-    await update.message.reply_html(
-        text,
-        reply_markup=ReplyKeyboardMarkup(
-            [[KeyboardButton("/start")]],
-            resize_keyboard=True
-        )
-    )
-
 # Главный обработчик команд
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
@@ -103,8 +86,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not update.message:
         return ConversationHandler.END
 
+    if not context.user_data.get("started"):
+        context.user_data["started"] = True
+
+        text = (
+            "🍵 <b>Привет! Добро пожаловать в TeaPot — бот-дневник для чаеманов.</b>\n\n"
+            "Сохраняй заметки о чаях, оценивай, сортируй и возвращайся к лучшим вкусам позже.\n\n"
+            "Нажми кнопку ниже или просто выбери действие ☕"
+        )
+
+        await update.message.reply_html(
+            text,
+            reply_markup=ReplyKeyboardMarkup(
+                [[KeyboardButton("/start")]],  # Или кнопку /start, если хочешь именно её
+                resize_keyboard=True
+            )
+        )
+
+        # Можно подождать пару секунд или просто завершить функцию
+        return CHOOSING_ACTION
+
+    # Показываем меню
     await update.message.reply_text(
-        "🍵 Добро пожаловать в TeaPot!",
+        "🍵 Что будем делать?",
         reply_markup=main_menu_keyboard()
     )
     return CHOOSING_ACTION
@@ -475,7 +479,7 @@ def main():
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
-    application.add_handler(CommandHandler("welcome", welcome))
+
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(conv)
     logger.info("✅ Bot started")
