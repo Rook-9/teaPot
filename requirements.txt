@@ -8,3 +8,5 @@ pydub
 pytest-asyncio
 pytest
 aiogram
+psycopg2-binary
+sqlalchemy
