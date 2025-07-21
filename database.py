@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 
 # DATABASE_URL должен быть задан в переменных окружения или .env
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///teapot.db")
+DATABASE_URL = os.getenv("DATABASE_URL") 
 
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

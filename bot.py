@@ -6,6 +6,7 @@ from telegram.ext import (
 import logging
 import database as db
 from utils import format_entry
+from sqlalchemy.orm import declarative_base
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -146,8 +147,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             last = entries[0]
             await update.message.reply_text(
                 f"🧾 Последняя запись:\n\n"
-                f"Название: {last[2]}\nОписание: {last[3]}\nЗаварка: {last[4]}\n"
-                f"Оценка: {last[5]}/10\nЦена: {last[6]}₾\nДата: {last[7]}"
+                f"Название: {last.tea_name}\nОписание: {last.description}\nЗаварка: {last.how_to_brew}\n"
+                f"Оценка: {last.rating}/10\nЦена: {last.price}₾\nДата: {last.created_at}"
             )
         else:
             await update.message.reply_text("Нет записей.")
@@ -192,8 +193,8 @@ async def show_all_entries(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("Нет записей в дневнике.")
     else:
         response = ""
-        for i, row in enumerate(entries, start=1):
-            response += format_entry(row) + "\n\n"
+        for i, entry in enumerate(entries, start=1):
+            response += format_entry(entry) + "\n\n"
 
         await update.message.reply_text(response[:4000])  # Telegram limit
     return CHOOSING_ACTION
@@ -240,7 +241,7 @@ async def delete_entry_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     reply = "Выбери номер записи для удаления:\n\n"
     for i, row in enumerate(entries, 1):
-        reply += f"{i}. {row[2]} — {row[4]} — {row[5]}/10\n"
+        reply += f"{i}. {row.tea_name} — {row.how_to_brew} — {row.created_at}/10\n"
 
     await update.message.reply_text(reply)
     return CHOOSING_DELETE_ENTRY
@@ -261,7 +262,7 @@ async def choose_entry_to_delete(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data["entry_to_delete"] = entry
 
     await update.message.reply_text(
-        f"Удалить запись:\n🍵 {entry[2]}\n💬 {entry[3]}\n🌟 {entry[5]}/10\n\nПодтвердить?",
+        f"Удалить запись:\n🍵 {entry.tea_name}\n💬 {entry.description}\n🌟 {entry.rating}/10\n\nПодтвердить?",
         reply_markup=ReplyKeyboardMarkup([["✅ Да", "❌ Нет"]], resize_keyboard=True)
     )
     return CONFIRM_DELETE
@@ -271,7 +272,7 @@ async def confirm_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if choice == "✅ Да":
         entry = context.user_data.get("entry_to_delete")
         if entry:
-            db.delete_entry(entry[0])  # предполагаем, что row[0] — это ID записи
+            db.delete_entry(entry.id) 
             await update.message.reply_text("Запись удалена ✅")
     else:
         await update.message.reply_text("Удаление отменено.")
@@ -334,15 +335,19 @@ async def handle_search_input(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("❌ Ничего не найдено.")
     else:
         reply = "\n\n".join([
-            f"🍵 {row[2]}\n💬 {row[3]}\n🔧 {row[4]}\n🌟 {row[5]}/10\n💰 {row[6]}₾"
+            f"🍵 {row.tea_name}\n"
+            f"💬 {row.description}\n"
+            f"🔧 {row.how_to_brew}\n"
+            f"🌟 {row.rating}/10\n"
+            f"💰 {row.price}₾"
             for row in results
         ])
         await update.message.reply_text(reply)
 
     await update.message.reply_text(
-    "🔍 Что дальше?",
-    reply_markup=main_menu_keyboard()
-)
+        "🔍 Что дальше?",
+        reply_markup=main_menu_keyboard()
+    )
     return CHOOSING_ACTION
 
 
